@@ -12,10 +12,35 @@ import Select from '@material-ui/core/Select';
 import MenuItem from '@material-ui/core/MenuItem';
 import FormControl from '@material-ui/core/FormControl';
 import InputLabel from '@material-ui/core/InputLabel';
+import IconButton from '@material-ui/core/IconButton';
+import AddCircleRoundedIcon from '@material-ui/icons/AddCircleRounded';
+
+import firebase from './firebase/index';
+
+import ListSubheader from '@material-ui/core/ListSubheader';
+import List from '@material-ui/core/List';
+import ListItem from '@material-ui/core/ListItem';
+import ListItemText from '@material-ui/core/ListItemText';
+import { makeStyles } from '@material-ui/core/styles';
+import Paper from '@material-ui/core/Paper';
 
 //axios.defaults.headers.post["Content-Type"] = "application/x-www-form-urlencoded";
 
-const  App =() => {
+const App =() => {
+
+  const useStyles = makeStyles((theme) => ({
+    paper: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      '& > *': {
+        marginBottom: theme.spacing(2),
+        // width: theme.spacing(16),
+        // height: theme.spacing(16),
+      },
+    },
+  }));
+
+  const classes = useStyles();
 
   let test;
   //#region GoogleMaps部分
@@ -26,6 +51,8 @@ const  App =() => {
   // const [lng,setLng] = useState({lat:lat,lng:lng})
   
   const [zoom,setZoom] =useState(14)
+
+  const [favoritelist ,setFavoritelist] = useState(null);
 
 
   const AnyReactComponent = ({ text }) => <div>{text}</div>;
@@ -73,6 +100,9 @@ const  App =() => {
       }else{
         setReadCount(1);
       }
+
+      const result = getFavoritelistFromFirestore();
+
     },[])
     
   //#endregion
@@ -85,6 +115,7 @@ const  App =() => {
     .then(function (response) {
         // handle success
         // stateに情報を追加する。
+        console.log(response);
         setLocalinfolist(response.data.Feature);
     })
     .catch(function (error) {
@@ -122,6 +153,8 @@ const  App =() => {
     setKeyword(event.target.value)
   }
 
+
+
   const Locallist = localinfolist?.map((x, index) =>
     <div>
       <LocalInfo
@@ -145,6 +178,45 @@ const  App =() => {
   const [searchDistance, setSearchDistance] = React.useState(3);
   const handleChangeSearchDistance = (event) =>{
     setSearchDistance(event.target.value);
+  }
+
+  // Firestoreにデータを送信する関数
+  const postDataToFirestore = async (collectionName, postData) => {
+    const addedData = await firebase.firestore().collection(collectionName).add(postData);
+    return addedData;
+  }
+
+  // firestoreから全データを取得してstateに格納する関数
+  const getFavoritelistFromFirestore = async () => {
+    const favoriteList_FB = await firebase.firestore().collection('favoritelist')
+      //並び替え
+      .get();
+    console.log(favoriteList_FB.docs[0].data().name);
+    const favoriteListArray = favoriteList_FB.docs.map(x => {
+      return {
+        shopid: x.id,
+        name: x.data().name,
+      }
+    })
+    setFavoritelist(favoriteListArray);
+    return favoriteListArray;
+  }
+
+
+  const onClickIconBtn = async (shopinfo,event) => {
+    
+    // firebaseへお気に入り登録する
+    //if (todo === '' || limit === '') { return false };
+    const postData = {
+      shopid: shopinfo.Id,
+      name: shopinfo.Name,
+    }
+    const addedData = await postDataToFirestore('favoritelist', postData);
+    //getTodosFromFirestore();
+
+    alert("お気に入りに追加されました！")
+
+    getFavoritelistFromFirestore();
   }
 
   return (
@@ -176,6 +248,24 @@ const  App =() => {
       </div>
       <div style={{marginBottom: '5px'}}>
         <Button variant="contained" color="primary" onClick = {SearchButtonOnClick} >LocalSearch</Button>
+      </div>
+      <div className={classes.paper}>
+        <Paper elevation={3}>
+        <List 
+          component="nav"
+          aria-labelledby="nested-list-subheader"
+          subheader={
+            <ListSubheader component="div" id="nested-list-subheader">
+              お気に入りリスト
+            </ListSubheader>
+          }>
+            {favoritelist?.map((x, index) => (
+              <ListItem button key={index}>
+                <ListItemText primary={x.name} />
+              </ListItem>
+            ))}
+        </List>
+        </Paper>
       </div>
       {/* <div style={{ height: '100vh', width: '100%' }}> */}
         {/* <GoogleMapReact
@@ -218,11 +308,15 @@ const  App =() => {
             <GridListTileBar
               title={x.Name}
               subtitle={<span>{x.Property.Address}</span>}
+              actionIcon={
+                <IconButton aria-label={`info about ${x.Name}`} color="primary" onClick={onClickIconBtn.bind(this,x)} id = {x.uid}>
+                  <AddCircleRoundedIcon />
+                </IconButton>
+              }
             />
           </GridListTile>
         ))}
       </GridList>
-
     </>
   );
 }
